@@ -1,0 +1,161 @@
+import DatagramSocket from 'java.net.DatagramSocket'
+import InetAddress from 'java.net.InetAddress'
+import DatagramPacket from 'java.net.DatagramPacket'
+import ByteArray from 'kotlin.ByteArray'
+import String from 'kotlin.String'
+import SocketTimeoutException from 'java.net.SocketTimeoutException'
+import InetSocketAddress from 'java.net.InetSocketAddress';
+
+export class UDPData {
+	/** 收到消息的目标地址 */
+	address : InetAddress
+	/** 收到消息的目标主机 */
+	host : String
+	/** 收到消息的目标端口 */
+	port : Int
+	/** 消息长度 */
+	size : Int
+	/** 消息 */
+	msg : String
+
+	constructor(address : InetAddress, host : String, port : Int, size : Int, msg : String) {
+		this.address = address;
+		this.host = host;
+		this.port = port;
+		this.size = size;
+		this.msg = msg;
+	}
+}
+
+export type UDPClientSendOption = {
+	/** 目标主机 */
+	host : String
+	/** 目标端口 */
+	port : Number
+	/** 发送的消息 */
+	msg : String
+	/** 发送消息后，是否监听一次目标主机的回复，默认值false，若为true，则在onceReceive中回调目标主机的回复，若目标主机超时未回复，则回调onceTimeout */
+	enableRecive ?: boolean
+	/** 等待目标主机回复消息的超时时间，单位毫秒，默认5000 */
+	receiveTimeout ?: Number
+	/** 主机回复时接收的字节大小，单位是byte，默认1024 */
+	receiveByteSize ?: Number
+	/** 目标主机回复消息的回调函数 */
+	onceReceive ?: (data : UDPData) => void
+	/** 目标主机超时未回复的回调函数 */
+	onceReceiveTimeout ?: () => void
+	/** 出错的回调函数 */
+	onError ?: (error : String) => void
+	/** 结束的回调函数（调用成功、失败都会执行） */
+	onCompleted ?: () => void;
+}
+
+class UDPThread extends Thread {
+	private callback : () => void
+
+	constructor(callback : () => void) {
+		super();
+		this.callback = callback;
+	}
+
+	override run() : void {
+		this.callback()
+	}
+}
+
+export class UDPServer {
+	private port : Int
+	private byteSize : Int
+	private socket : DatagramSocket | null = null
+	private isListener = false
+
+	constructor(port : Int, byteSize : Number = 1024) {
+		this.port = port;
+		this.byteSize = byteSize.toInt();
+	}
+
+	/** 监听接收消息 */
+	listener(receive : (data : UDPData) => void, error ?: (message : String) => void) {
+		if (this.socket != null || this.isListener) return
+
+		// 另开线程，避免阻塞UI线程
+		new UDPThread(() => {
+			// 端口指定为null，不然内部会随机指定端口，当再调用bind函数绑定端口时，会报异常already bound
+			const socket = new DatagramSocket(null)
+			this.socket = socket;
+			try {
+				socket.bind(new InetSocketAddress(this.port))
+				const buff = new ByteArray(this.byteSize)
+				const packet = new DatagramPacket(buff, buff.size)
+				this.isListener = true;
+				while (true) {
+					this.socket?.receive(packet)
+					const msg = new String(buff, 0, packet.getLength())
+					const data = new UDPData(packet.getAddress(), packet.getAddress().getHostName(), packet.getPort().toInt(), msg.length, msg)
+					receive(data)
+				}
+			} catch (e) {
+				if (!socket.isClosed()) {
+					error?.(e.message.toString())
+				}
+				this.stop()
+			}
+		}).start()
+	}
+
+	/** 向客户端发送消息 */
+	send(msg : string, host : string, port : Int) {
+		new UDPThread(() => {
+			const bytes = msg.toByteArray()
+			const address = InetAddress.getByName(host)
+			this.socket?.send(new DatagramPacket(bytes, bytes.size, address, port))
+		}).start()
+	}
+
+	/** 停止服务端 */
+	stop() {
+		this.isListener = false
+		this.socket?.close()
+		this.socket = null
+	}
+}
+
+export class UDPClient {
+	static send(option : UDPClientSendOption) {
+		// 另开线程，避免阻塞UI线程
+		new UDPThread(() => {
+			const content = option.msg.toByteArray()
+			const socket = new DatagramSocket()
+
+			let receiveTimeout = option.receiveTimeout;
+			let receiveByteSize = option.receiveByteSize;
+			let enableRecive = option.enableRecive;
+
+			if (receiveTimeout == null) receiveTimeout = 5000;
+			if (receiveByteSize == null) receiveByteSize = 1024;
+			if (enableRecive == null) enableRecive = false;
+
+			try {
+				socket.send(new DatagramPacket(content, content.size, InetAddress.getByName(option.host), option.port.toInt()))
+				if (enableRecive) {
+					const buff = new ByteArray(receiveByteSize.toInt())
+					const packet = new DatagramPacket(buff, buff.size)
+					socket.setSoTimeout(receiveTimeout.toInt())
+					socket.receive(packet)
+					const receiveMsg = new String(buff, 0, packet.getLength())
+					const data = new UDPData(packet.getAddress(), packet.getAddress().getHostName(), packet.getPort().toInt(), receiveMsg.length, receiveMsg)
+					option.onceReceive?.(data)
+				}
+			} catch (e) {
+				if (e instanceof SocketTimeoutException) {
+					option.onceReceiveTimeout?.()
+				} else {
+					option.onError?.(e.message.toString())
+				}
+			} finally {
+				socket.close()
+				option.onCompleted?.()
+			}
+		}).start()
+	}
+}

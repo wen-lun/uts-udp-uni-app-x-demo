@@ -1,0 +1,48 @@
+<template>
+	<view class="content">
+		<textarea v-model="msg" type="textarea" auto-height placeholder="请输入内容"></textarea>
+		<button @click="onSendClick">发送消息</button>
+		<view class="box">
+			<view v-for="item in messages" class="item">服务器[{{item.host}}]回复消息：{{ item.msg }}</view>
+		</view>
+	</view>
+</template>
+
+<script lang="uts">
+import { UDPClient, UDPClientSendOption, UDPData } from '@/uni_modules/uts-udp';
+
+export default {
+	data() {
+		return {
+			msg: "",
+			messages: [] as UDPData[]
+		}
+	},
+	methods: {
+		onSendClick() {
+			UDPClient.send({
+				host: "255.255.255.255",
+				port: 7000,
+				receiveTimeout: 2000,
+				msg: this.msg,
+				enableRecive: true,
+				onceReceive(data) {
+					this.messages.push(data)
+				},
+				onError(error) {
+					console.error(error);
+				},
+				onceReceiveTimeout() {
+					console.warn("服务器超时未回复");
+				},
+			} as UDPClientSendOption);
+		}
+	}
+}
+</script>
+
+<style lang="scss" scoped>
+	.box {
+		padding: 10px;
+	}
+</style>

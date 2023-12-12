@@ -1,0 +1,76 @@
+<template>
+	<view class="content">
+		<view class="btns">
+			<button v-if="!isStart" type="primary" size="mini" @click="onEnableClick">启动UDP服务</button>
+			<button v-else type="warn" size="mini" @click="onDisableClick">停止UDP服务</button>
+		</view>
+		<view class="status">{{ isStart ? "UDP服务已启动" : "UDP服务未启动" }}</view>
+		<view class="box">
+			<view v-for="item in messages" class="item">
+				<view class="info">
+					<text class="label">主机：{{ item.host }}</text>
+					<text class="label">端口：{{ item.port }}</text>
+				</view>
+				<view class="msg">消息：{{ item.msg }}</view>
+			</view>
+		</view>
+	</view>
+</template>
+
+<script lang="uts">
+import {
+	UDPServer,
+	UDPData
+} from "@/uni_modules/uts-udp";
+
+var server : UDPServer | null = null;
+
+export default {
+	data() {
+		return {
+			messages: [] as UDPData[],
+			isStart: false
+		}
+	},
+	methods: {
+		onEnableClick() {
+			if (this.isStart) return;
+			if (server == null) {
+				server = new UDPServer(7000);
+			}
+			server?.listener(
+				(data) => {
+					this.messages.push(data)
+					// 回复客户端
+					server?.send(`已收到消息：${data.msg}`, data.host, data.port);
+				},
+				(error) => {
+					console.error(error);
+					this.isStart = false;
+				}
+			);
+			this.isStart = true;
+		},
+		onDisableClick() {
+			server?.stop();
+			this.isStart = false;
+		}
+	}
+}
+</script>
+
+<style>
+	.btns {
+		padding: 10px;
+	}
+
+	.box {
+		padding: 10px;
+
+	}
+
+	.box .item {
+		padding: 10px;
+
+	}
+</style>

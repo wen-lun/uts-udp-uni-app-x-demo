@@ -1,0 +1,22 @@
+{
+  "id": "__UNI__BC1FF7C",
+  "name": "uts-udp-uni-app-x-demo",
+  "description": "",
+  "version": {
+    "name": "1.0.0",
+    "code": "100"
+  },
+  "uni-app-x": {},
+  "app": {
+    "distribute": {
+      "icons": {
+        "android": {
+          "hdpi": "",
+          "xhdpi": "",
+          "xxhdpi": "",
+          "xxxhdpi": ""
+        }
+      }
+    }
+  }
+}

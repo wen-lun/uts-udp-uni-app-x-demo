@@ -1,0 +1,102 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import {
+	UDPServer,
+	UDPData
+} from "@/uni_modules/uts-udp";
+
+var server : UDPServer | null = null;
+
+export default {
+	data() {
+		return {
+			messages: [] as UDPData[],
+			isStart: false
+		}
+	},
+	methods: {
+		onEnableClick() {
+			if (this.isStart) return;
+			if (server == null) {
+				server = new UDPServer(7000);
+			}
+			server?.listener(
+				(data) => {
+					this.messages.push(data)
+					// 回复客户端
+					server?.send(`已收到消息：${data.msg}`, data.host, data.port);
+				},
+				(error) => {
+					console.error(error);
+					this.isStart = false;
+				}
+			);
+			this.isStart = true;
+		},
+		onDisableClick() {
+			server?.stop();
+			this.isStart = false;
+		}
+	}
+}
+
+
+function GenPagesServerRender(): VNode | null {
+const _ctx = this
+const _component_button = resolveComponent("button")
+
+  return createElementVNode("view", utsMapOf({ class: "content" }), [
+    createElementVNode("view", utsMapOf({ class: "btns" }), [
+      isTrue(!_ctx.isStart)
+        ? createVNode(_component_button, utsMapOf({
+            key: 0,
+            type: "primary",
+            size: "mini",
+            onClick: _ctx.onEnableClick
+          }), utsMapOf({
+            default: withCtx((): any[] => ["启动UDP服务"]),
+            _: 1 /* STABLE */
+          }), 8 /* PROPS */, ["onClick"])
+        : createVNode(_component_button, utsMapOf({
+            key: 1,
+            type: "warn",
+            size: "mini",
+            onClick: _ctx.onDisableClick
+          }), utsMapOf({
+            default: withCtx((): any[] => ["停止UDP服务"]),
+            _: 1 /* STABLE */
+          }), 8 /* PROPS */, ["onClick"])
+    ]),
+    createElementVNode("view", utsMapOf({ class: "status" }), toDisplayString(_ctx.isStart ? "UDP服务已启动" : "UDP服务未启动"), 1 /* TEXT */),
+    createElementVNode("view", utsMapOf({ class: "box" }), [
+      createElementVNode(Fragment, null, RenderHelpers.renderList(_ctx.messages, (item, _, _): VNode => {
+        return createElementVNode("view", utsMapOf({ class: "item" }), [
+          createElementVNode("view", utsMapOf({ class: "info" }), [
+            createElementVNode("text", utsMapOf({ class: "label" }), "主机：" + toDisplayString(item.host), 1 /* TEXT */),
+            createElementVNode("text", utsMapOf({ class: "label" }), "端口：" + toDisplayString(item.port), 1 /* TEXT */)
+          ]),
+          createElementVNode("view", utsMapOf({ class: "msg" }), "消息：" + toDisplayString(item.msg), 1 /* TEXT */)
+        ])
+      }), 256 /* UNKEYED_FRAGMENT */)
+    ])
+  ])
+}
+const GenPagesServerStyles = [utsMapOf([["btns", padStyleMapOf(utsMapOf([["padding", 10]]))], ["box", padStyleMapOf(utsMapOf([["padding", 10]]))], ["item", utsMapOf([[".box ", utsMapOf([["padding", 10]])]])]])]
